@@ -1,0 +1,7 @@
+{
+  "name": "最強",
+  "description": "A modern, minimalist study companion for high school students featuring AI tutoring, adaptive quizzes, and focus tools.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
