@@ -7,58 +7,35 @@ const API_KEYS = [
   import.meta.env.VITE_GEMINI_API_KEY_3
 ].filter(Boolean);
 
-// 最速モデルを使用
+// 最速・最小のモデルを固定
 const MODEL_TEXT = 'gemini-1.5-flash-8b';
 
 async function getAIResponse(callback: (ai: any) => Promise<any>) {
-  let lastError;
   for (const key of API_KEYS) {
     try {
       const ai = new GoogleGenAI({ apiKey: key });
       return await callback(ai);
-    } catch (error) {
-      lastError = error;
-      continue;
-    }
+    } catch (e) { continue; }
   }
-  throw lastError || new Error("All keys failed.");
+  throw new Error("Retry");
 }
 
-export const createChatStream = async function* (
-  history: any[],
-  newMessage: string,
-  imageDataUrl?: string,
-  userProfile?: UserProfile
-) {
-  // AI先生の性格を維持
-  let systemInstruction = `予備校講師として、論理的かつ温かみのある指導を行ってください。`;
-
+export const createChatStream = async function* (h: any[], m: string, i?: string, p?: UserProfile) {
   const result = await getAIResponse(async (ai) => {
-    const chat = ai.chats.create({
-      model: MODEL_TEXT,
-      history: history,
-      config: { systemInstruction }
-    });
-    let messageContent: any = newMessage;
-    if (imageDataUrl) {
-      const [header, base64Data] = imageDataUrl.split(',');
-      const mimeType = header.match(/:(.*?);/)?.[1] || 'image/jpeg';
-      messageContent = {
-        parts: [{ text: newMessage || "解説して。" }, { inlineData: { mimeType, data: base64Data } }]
-      };
+    const chat = ai.chats.create({ model: MODEL_TEXT, config: { systemInstruction: "予備校講師として短く回答。" } });
+    let msg: any = m;
+    if (i) {
+      const [head, data] = i.split(',');
+      msg = { parts: [{ text: m || "解説" }, { inlineData: { mimeType: head.match(/:(.*?);/)?.[1] || 'image/jpeg', data } }] };
     }
-    return await chat.sendMessageStream({ message: messageContent });
+    return await chat.sendMessageStream({ message: msg });
   });
-
-  for await (const chunk of result) {
-    yield chunk.text;
-  }
+  for await (const chunk of result) { yield chunk.text; }
 };
 
-export const generateTestQuestions = async (topic: string, userProfile?: UserProfile, count: number = 2): Promise<TestQuestion[]> => {
-  // ★ポイント1：問題を「2問」に減らして処理時間を短縮
-  // ★ポイント2：解説を「1行」に制限して通信量を最小化
-  const prompt = `${topic}の4択問題を${count}問、JSONで作成。解説は1行で。`;
+export const generateTestQuestions = async (topic: string, userProfile?: UserProfile, count: number = 1): Promise<TestQuestion[]> => {
+  // ★重要：問題を「1問」だけに絞り、解説も「10文字以内」に制限して、10秒の壁を突破する
+  const prompt = `${topic}の4択問題を1問作成。JSON形式で。解説は10文字以内。`;
 
   const response = await getAIResponse(async (ai) => {
     return await ai.models.generateContent({
@@ -83,8 +60,6 @@ export const generateTestQuestions = async (topic: string, userProfile?: UserPro
     });
   });
 
-  if (response.text) {
-    return JSON.parse(response.text.trim()) as TestQuestion[];
-  }
-  throw new Error("Retry");
+  if (response.text) return JSON.parse(response.text.trim()) as TestQuestion[];
+  throw new Error("Err");
 };
