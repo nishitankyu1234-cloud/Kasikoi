@@ -8,7 +8,7 @@ const API_KEYS = [
   import.meta.env.VITE_GEMINI_API_KEY_3
 ].filter(Boolean);
 
-const MODEL_TEXT = 'gemini-1.5-flash';
+const MODEL_TEXT = 'gemini-1.5-flash-8b';
 
 /**
  * 複数のAPIキーを順番に試して、AIの返答をもらうための共通関数
